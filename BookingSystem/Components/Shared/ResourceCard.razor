@@ -1,0 +1,40 @@
+@using BookingSystem.Models
+
+<div class="card h-100 shadow-sm @(IsSelected ? "border-primary border-2" : "")" 
+     style="cursor: pointer; transition: transform 0.15s ease;"
+     @onclick="HandleClick">
+    <div class="card-body d-flex flex-column">
+        <div class="d-flex justify-content-between align-items-start mb-2">
+            <span class="badge bg-secondary">@Resource.Category</span>
+            <span class="fw-bold text-primary">$@Resource.PricePerHour / hr</span>
+        </div>
+        <h5 class="card-title">@Resource.Name</h5>
+        <p class="card-text text-muted small flex-grow-1">@Resource.Description</p>
+        <div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top">
+            <small class="text-muted">Capacity: <strong>@Resource.Capacity</strong> people</small>
+            @if (IsSelected)
+            {
+                <span class="badge bg-primary">Selected</span>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public Resource Resource { get; set; } = default!;
+
+    [Parameter]
+    public bool IsSelected { get; set; }
+
+    [Parameter]
+    public EventCallback<Resource> OnSelect { get; set; }
+
+    private async Task HandleClick()
+    {
+        if (OnSelect.HasDelegate)
+        {
+            await OnSelect.InvokeAsync(Resource);
+        }
+    }
+}

@@ -1,0 +1,179 @@
+﻿@page "/"
+@using BookingSystem.Components.Shared
+@using BookingSystem.Models
+@using BookingSystem.State
+@inject BookingStateContainer State
+@implements IDisposable
+
+<PageTitle>Resource Booking System</PageTitle>
+
+<div class="container py-4">
+    <!-- Top Header and Demo Role Switcher (RBAC Demonstration) -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 pb-3 border-bottom gap-3">
+        <div>
+            <h2 class="mb-0 fw-bold">Workspace & Room Booking</h2>
+            <small class="text-muted">Real-time scheduling powered by Blazor & SignalR</small>
+        </div>
+
+        <div class="d-flex align-items-center gap-2 bg-light p-2 rounded border">
+            <span class="small text-muted">Active Role:</span>
+            <select class="form-select form-select-sm w-auto fw-semibold"
+                    value="@State.CurrentUserRole"
+                    @onchange="HandleRoleChange">
+                <option value="@UserRole.Client">Client (Standard Rate)</option>
+                <option value="@UserRole.Manager">Manager (50% Discount)</option>
+                <option value="@UserRole.Admin">Admin (Free Access)</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Alert Notifications -->
+    @if (!string.IsNullOrEmpty(State.LastNotification))
+    {
+        <div class="alert @(State.IsErrorNotification ? "alert-danger" : "alert-success") alert-dismissible fade show" role="alert">
+            @State.LastNotification
+            <button type="button" class="btn-close" @onclick="State.ClearNotification"></button>
+        </div>
+    }
+
+    @if (State.IsLoading)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status"></div>
+            <p class="mt-2 text-muted">Loading resources and schedule...</p>
+        </div>
+    }
+    else
+    {
+        <!-- Select Resource -->
+        <h5 class="mb-3">1. Select a Resource</h5>
+        <div class="row g-3 mb-4">
+            @foreach (var resource in State.Resources)
+            {
+                <div class="col-12 col-md-6 col-lg-3">
+                    <ResourceCard Resource="resource"
+                                  IsSelected="@(State.SelectedResource?.Id == resource.Id)"
+                                  OnSelect="State.SelectResourceAsync" />
+                </div>
+            }
+        </div>
+
+        <!-- Select Date and Time Slot -->
+        @if (State.SelectedResource is not null)
+        {
+            <div class="card shadow-sm mb-5">
+                <div class="card-header bg-white py-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
+                    <div>
+                        <h5 class="mb-0">2. Available Slots: <span class="text-primary">@State.SelectedResource.Name</span></h5>
+                        <small class="text-muted">Click any green slot to book immediately</small>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <label class="form-label mb-0 small fw-semibold">Date:</label>
+                        <input type="date"
+                               class="form-control form-control-sm"
+                               value="@State.SelectedDate.ToString("yyyy-MM-dd")"
+                               min="@DateTime.Today.ToString("yyyy-MM-dd")"
+                               @onchange="HandleDateChange" />
+                    </div>
+                </div>
+                <div class="card-body">
+                    <TimeSlotGrid Slots="State.CurrentSlots"
+                                  IsBusy="_isProcessing"
+                                  OnBookSlot="HandleBookSlot" />
+                </div>
+            </div>
+        }
+
+        <!--User Bookings History and Cancellation -->
+        <h5 class="mb-3">3. My Bookings (@State.CurrentUserName)</h5>
+        @if (!State.MyBookings.Any())
+        {
+            <div class="alert alert-secondary">You have no bookings yet.</div>
+        }
+        else
+        {
+            <div class="table-responsive shadow-sm rounded">
+                <table class="table table-hover align-middle mb-0 bg-white">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Resource</th>
+                            <th>Date</th>
+                            <th>Time</th>
+                            <th>Total Price</th>
+                            <th>Status</th>
+                            <th class="text-end">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var booking in State.MyBookings)
+                        {
+                            <tr>
+                                <td class="fw-semibold">@(booking.Resource?.Name ?? "Resource")</td>
+                                <td>@booking.StartTime.ToString("MMM dd, yyyy")</td>
+                                <td>@booking.StartTime.ToString("HH:mm") - @booking.EndTime.ToString("HH:mm")</td>
+                                <td>$@booking.TotalPrice</td>
+                                <td>
+                                    <span class="badge @(booking.Status == BookingStatus.Confirmed ? "bg-success" : "bg-secondary")">
+                                        @booking.Status
+                                    </span>
+                                </td>
+                                <td class="text-end">
+                                    @if (booking.Status == BookingStatus.Confirmed && booking.StartTime > DateTime.Now)
+                                    {
+                                        <button class="btn btn-sm btn-outline-danger"
+                                                @onclick="() => State.CancelBookingAsync(booking.Id)">
+                                            Cancel
+                                        </button>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private bool _isProcessing;
+
+    protected override async Task OnInitializedAsync()
+    {
+        State.OnStateChanged += HandleStateChanged;
+        await State.InitializeAsync();
+    }
+
+    private async Task HandleRoleChange(ChangeEventArgs e)
+    {
+        if (Enum.TryParse<UserRole>(e.Value?.ToString(), out var selectedRole))
+        {
+            await State.SwitchDemoUserAsync(selectedRole);
+        }
+    }
+
+    private async Task HandleDateChange(ChangeEventArgs e)
+    {
+        if (DateTime.TryParse(e.Value?.ToString(), out var newDate))
+        {
+            await State.SelectDateAsync(newDate);
+        }
+    }
+
+    private async Task HandleBookSlot(TimeSlotDto slot)
+    {
+        _isProcessing = true;
+        await State.BookSlotAsync(slot);
+        _isProcessing = false;
+    }
+
+    private void HandleStateChanged()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        State.OnStateChanged -= HandleStateChanged;
+    }
+}

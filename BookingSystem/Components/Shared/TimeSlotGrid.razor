@@ -1,0 +1,45 @@
+@using BookingSystem.Models
+
+<div class="row g-2">
+    @if (!Slots.Any())
+    {
+        <div class="col-12">
+            <div class="alert alert-info mb-0">No time slots available for this date.</div>
+        </div>
+    }
+    else
+    {
+        @foreach (var slot in Slots)
+        {
+            <div class="col-6 col-md-4 col-lg-3">
+                <button class="btn w-100 py-2 d-flex flex-column align-items-center @(slot.IsAvailable ? "btn-outline-success" : "btn-light text-muted")"
+                        disabled="@(!slot.IsAvailable || IsBusy)"
+                        @onclick="() => HandleBookSlot(slot)">
+                    <span class="fw-bold">@slot.StartTime.ToString("HH:mm") - @slot.EndTime.ToString("HH:mm")</span>
+                    <small>
+                        @(slot.IsAvailable ? $"${slot.CalculatedPrice}" : "Booked")
+                    </small>
+                </button>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public IReadOnlyList<TimeSlotDto> Slots { get; set; } = Array.Empty<TimeSlotDto>();
+
+    [Parameter]
+    public bool IsBusy { get; set; }
+
+    [Parameter]
+    public EventCallback<TimeSlotDto> OnBookSlot { get; set; }
+
+    private async Task HandleBookSlot(TimeSlotDto slot)
+    {
+        if (slot.IsAvailable && OnBookSlot.HasDelegate)
+        {
+            await OnBookSlot.InvokeAsync(slot);
+        }
+    }
+}
