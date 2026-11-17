@@ -1,4 +1,0 @@
-<Solution>
-  <Project Path="BookingSystem.Tests/BookingSystem.Tests.csproj" />
-  <Project Path="BookingSystem/BookingSystem.csproj" />
-</Solution>
