@@ -25,82 +25,63 @@ A cross-platform web application for booking workspaces, meeting rooms, and medi
 
 ## System Architecture (UML Class Diagram)
 
-```mermaid
-classDiagram
-    class User {
-        +Guid Id
-        +string FullName
-        +string Email
-        +UserRole Role
-        +List~Booking~ Bookings
-    }
+<img width="8192" height="2299" alt="Resource Booking Architecture-2026-11-17-090218" src="https://github.com/user-attachments/assets/9debaed2-8004-4767-a714-8415af338123" />
 
-    class Resource {
-        +Guid Id
-        +string Name
-        +string Category
-        +int Capacity
-        +decimal PricePerHour
-        +bool IsActive
-    }
+---
 
-    class Booking {
-        +Guid Id
-        +Guid UserId
-        +Guid ResourceId
-        +DateTime StartTime
-        +DateTime EndTime
-        +decimal TotalPrice
-        +BookingStatus Status
-        +CalculateDuration() TimeSpan
-        +IsOverlapping(DateTime start, DateTime end) bool
-    }
+## Project Structure
 
-    class PricingCalculator {
-        <<Functional Logic Pure>>
-        +CalculatePrice(decimal hourlyRate, TimeSpan duration, UserRole role)$ decimal
-        +GenerateDailySlots(DateTime date, decimal hourlyRate, UserRole role, IEnumerable~Booking~ existingBookings)$ IReadOnlyList~TimeSlotDto~
-    }
+```text
+IFP_FinalProject/
+├── BookingSystem/                  # Main Blazor Server Web Application
+│   ├── Components/
+│   │   ├── Layout/                 # MainLayout & Navigation
+│   │   ├── Pages/                  # Home.razor (Main Dashboard)
+│   │   └── Shared/                 # Reusable Components (ResourceCard, TimeSlotGrid)
+│   ├── Data/                       # EF Core AppDbContext, BookingRepository, DbInitializer
+│   ├── Hubs/                       # SignalR BookingHub
+│   ├── Models/                     # Domain Entities, Enums, Immutable Records, Result<T>
+│   ├── Services/                   # BookingService, Interfaces, Functional PricingCalculator
+│   ├── State/                      # BookingStateContainer
+│   └── Program.cs                  # DI Container, SQLite & SignalR Configuration
+├── BookingSystem.Tests/            # xUnit Automated Test Suite
+│   ├── PricingCalculatorTests.cs   # Unit tests for pure FP pricing & slot generation
+│   └── BookingServiceTests.cs      # Unit tests for business rules, overlaps & RBAC
+├── docs/                           # Documentation assets & UML diagrams
+└── README.md
+```
 
-    class IBookingService {
-        <<interface>>
-        +GetAllResourcesAsync() Task~List~Resource~~
-        +GetResourceScheduleAsync(Guid resourceId, DateTime date, UserRole userRole) Task~Result~IReadOnlyList~TimeSlotDto~~~
-        +CreateBookingAsync(CreateBookingRequest request) Task~Result~Booking~~
-        +CancelBookingAsync(Guid bookingId, Guid currentUserId, UserRole currentUserRole) Task~Result~bool~~
-    }
+---
 
-    class BookingService {
-        -IBookingRepository _repository
-    }
+## Installation & Setup Guide
 
-    class IBookingRepository {
-        <<interface>>
-    }
+### Prerequisites
+* .NET 8.0 SDK or newer.
 
-    class BookingRepository {
-        -AppDbContext _context
-    }
+### Running the Application
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/tamikrom1/IFP_FinalProject
+   cd IFP_FinalProject
+   ```
+2. Run the web application (SQLite database `bookingsystem.db` will be created and seeded automatically on first launch):
+   ```bash
+   dotnet run --project BookingSystem/BookingSystem.csproj
+   ```
+3. Open your browser and navigate to the local URL displayed in the terminal (e.g., `http://localhost:5123`).
 
-    class BookingStateContainer {
-        +List~Resource~ Resources
-        +Resource SelectedResource
-        +DateTime SelectedDate
-        +IReadOnlyList~TimeSlotDto~ CurrentSlots
-        +event Action OnStateChanged
-        +BookSlotAsync(TimeSlotDto slot) Task~bool~
-        +CancelBookingAsync(Guid bookingId) Task
-    }
+### Running Automated Tests
+Execute all unit tests from the root directory:
+```bash
+dotnet test
+```
 
-    class BookingHub {
-        +NotifyScheduleChanged(Guid resourceId, DateTime date) Task
-    }
+---
 
-    User "1" --> "*" Booking : creates
-    Resource "1" --> "*" Booking : booked in
-    BookingService ..|> IBookingService : implements
-    BookingRepository ..|> IBookingRepository : implements
-    BookingService --> IBookingRepository : depends on
-    BookingService --> PricingCalculator : uses
-    BookingStateContainer --> IBookingService : calls
-    BookingStateContainer --> BookingHub : listens to
+## User Guide & Demo Walkthrough
+
+1. **Select a Resource:** Click on any room or workspace card in Section 1 to load its availability.
+2. **Choose Date & Time Slot:** Pick a target date in Section 2. Available slots are highlighted in green with calculated prices. Click a slot to book it instantly.
+3. **Test Real-Time Sync (SignalR):** Open the application in two side-by-side browser windows. Booking or cancelling a slot in one window immediately updates the slot availability in the second window without refreshing.
+4. **Test Role-Based Pricing & Permissions (RBAC):** Use the **Active Role** selector in the top-right header to switch between `Client` (100% rate), `Manager` (50% discount), and `Admin` (100% discount) to observe real-time price recalculations.
+5. **Manage Bookings:** View your active and cancelled reservations in Section 3 and click **Cancel** to release a booked slot back to the public schedule.
